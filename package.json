@@ -1,0 +1,26 @@
+{
+  "name": "decentralized-academic-credentials",
+  "private": true,
+  "workspaces": [
+    "contracts",
+    "scripts",
+    "frontend",
+    "shared"
+  ],
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=7.0.0"
+  },
+  "scripts": {
+    "node": "cd contracts && npx hardhat node",
+    "deploy": "cd scripts && ts-node deploy/deploy.ts --network localhost",
+    "deploy:sepolia": "cd scripts && ts-node deploy/deploy.ts --network sepolia",
+    "frontend": "cd frontend && vite",
+    "test:contracts": "cd contracts && npx hardhat test",
+    "test:e2e": "cd scripts && ts-node tests/integration/e2e.test.ts",
+    "compile": "cd contracts && npx hardhat compile"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0"
+  }
+}

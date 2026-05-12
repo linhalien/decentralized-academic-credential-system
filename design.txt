@@ -1,0 +1,181 @@
+================================================================================
+  DECENTRALIZED ACADEMIC CREDENTIAL SYSTEM — CODEBASE DESIGN
+  Topic 3 | Blockchain Capstone 2025.2
+================================================================================
+
+================================================================================
+PROJECT OVERVIEW
+================================================================================
+
+Chain        : Ethereum (Hardhat local + Sepolia testnet)
+Language     : Solidity ^0.8.20 (contracts), TypeScript (scripts + frontend)
+Framework    : Hardhat (contracts), React + Vite (frontend)
+Key features :
+  - ECC / ECDSA signing of credentials off-chain (ethers.js)
+  - Merkle tree selective disclosure (OpenZeppelin merkle-tree)
+  - On-chain registry: issuer whitelist + revocation list + credential anchors
+  - Salted leaf nodes for privacy (from P5)
+  - Timestamped revocation (advance over P6)
+  - Credential expiry encoded in signed bundle (differentiator)
+
+
+================================================================================
+REPO STRUCTURE
+================================================================================
+
+decentralized-academic-credential-system/
+│
+├── contracts/                  #Solidity smart contracts (Person 3)
+│   ├── src/
+│   │   ├── CredentialRegistry.sol
+│   │   ├── MerkleVerifier.sol
+│   │   └── interfaces/
+│   │       └── ICredentialRegistry.sol
+│   ├── test/
+│   │   ├── CredentialRegistry.test.ts
+│   │   └── MerkleVerifier.test.ts
+│   ├── hardhat.config.ts
+│   ├── package.json
+│   └── .env                    #PRIVATE_KEY, RPC_URL
+│
+├── scripts/                    #Off-chain Node.js scripts (Person 1 + 2)
+│   ├── issuer/
+│   │   ├── buildCredential.ts  #Assemble credential bundle
+│   │   ├── signCredential.ts   #ECDSA sign with university private key
+│   │   └── anchorCredential.ts #Call registry.anchor() on-chain
+│   ├── holder/
+│   │   ├── buildMerkleTree.ts  #Build Merkle tree from (course, grade) pairs
+│   │   ├── generateProof.ts    #Generate proof for selected leaves
+│   │   └── exportProof.ts      #Export proof.json for verifier
+│   ├── verifier/
+│   │   └── verifyCredential.ts #Off-chain + on-chain verification flow
+│   ├── deploy/
+│   │   └── deploy.ts           #Deploy contracts to local / Sepolia
+│   └── package.json
+│
+├── frontend/                   #React + Vite UI (Person 4)
+│   ├── src/
+│   │   ├── pages/
+│   │   │   ├── UniversityPage.tsx    #Issue credential flow
+│   │   │   ├── StudentPage.tsx       #Generate selective proof flow
+│   │   │   └── VerifierPage.tsx      #Verify credential flow
+│   │   ├── components/
+│   │   │   ├── CredentialCard.tsx
+│   │   │   ├── MerkleProofPanel.tsx
+│   │   │   ├── CourseSelector.tsx
+│   │   │   └── StatusBadge.tsx
+│   │   ├── hooks/
+│   │   │   ├── useRegistry.ts        #wagmi contract read/write hooks
+│   │   │   └── useWallet.ts
+│   │   ├── lib/
+│   │   │   ├── merkle.ts             #Wrapper around @openzeppelin/merkle-tree
+│   │   │   └── credential.ts         #Credential bundle builder
+│   │   ├── App.tsx
+│   │   └── main.tsx
+│   ├── index.html
+│   ├── vite.config.ts
+│   └── package.json
+│
+├── shared/                     ← Types and constants used by all layers
+│   ├── types.ts                ← Credential, Course, MerkleProof interfaces
+│   ├── constants.ts            ← Contract ABI, deployed addresses
+│   └── package.json
+│
+├── docs/
+│   ├── architecture.md
+│   └── eraser_diagram.txt      #Eraser.io diagram code
+│
+├── package.json                #Root workspace config (npm workspaces)
+└── README.md
+
+
+================================================================================
+DATA STRUCTURES & SCHEMAS
+================================================================================
+
+ON-CHAIN STATE (CredentialRegistry.sol):
+  issuers          : address → bool
+  merkleRoots      : bytes32 → bytes32
+  revocations      : bytes32 → Revocation{ bool, uint256 }
+
+OFF-CHAIN FILES:
+  /data/issued/{studentId}.json     ← full SignedCredential (held by issuer)
+  /data/proofs/{studentId}_{ts}.json ← ProofPackage (shared with verifier)
+
+MERKLE TREE:
+  Leaf encoding  : keccak256(abi.encode(courseName, grade, salt))
+  Tree ordering  : sorted pairs (OpenZeppelin StandardMerkleTree default)
+  Root           : bytes32, anchored on-chain via registry.anchor()
+  Proof          : array of sibling hashes from leaf to root
+
+
+================================================================================
+KEY ALGORITHMS
+================================================================================
+
+---- ECDSA SIGNING (scripts/issuer/signCredential.ts) ----
+
+1. bundle = buildCredential(studentData)
+2. bundleJSON = JSON.stringify(bundle, keys sorted alphabetically)
+   (deterministic serialization — same bundle always produces same hash)
+3. msgHash = keccak256(bundleJSON)
+4. signature = wallet.signMessage(ethers.getBytes(msgHash))
+   (ethers.js prepends "\x19Ethereum Signed Message:\n32" per EIP-191)
+5. { r, s, v } = ethers.Signature.from(signature)
+
+Ref: P4 — deterministic nonce via RFC 6979 prevents weak-randomness attack
+
+
+---- MERKLE LEAF CONSTRUCTION (scripts/holder/buildMerkleTree.ts) ----
+
+For each course[i]:
+  salt[i] = crypto.randomBytes(32)
+  leaf[i] = keccak256(abi.encode(course[i].name, course[i].grade, salt[i]))
+
+Tree = StandardMerkleTree.of(
+  leaves.map((l, i) => [courses[i].name, courses[i].grade, salts[i]]),
+  ["string", "string", "bytes32"]
+)
+root = tree.root
+
+Ref: P5 — salt prevents verifier from brute-forcing (course, grade) pairs
+
+
+---- SELECTIVE DISCLOSURE PROOF (scripts/holder/generateProof.ts) ----
+
+For each selectedCourse[j]:
+  leafIndex = tree.leafLookup([name, grade, salt])
+  proof[j]  = tree.getProof(leafIndex)
+  ← proof[j] contains only the sibling hashes needed
+  ← unrevealed courses contribute only their hashes to internal nodes
+
+Output: [{ name, grade, salt, proof[] }, ...]
+
+
+---- ON-CHAIN VERIFICATION (CredentialRegistry.sol: verify()) ----
+
+function verify(credentialHash, proof[], leaf) returns bool:
+  1. require(!revocations[credentialHash].revoked, "revoked")
+  2. root = merkleRoots[credentialHash]
+  3. require(root != bytes32(0), "not anchored")
+  4. return MerkleProof.verify(proof, root, leaf)
+
+Leaf re-hash by Solidity:
+  computed = keccak256(abi.encode(courseName, grade, salt))
+  must match the leaf submitted
+
+
+---- CREDENTIAL EXPIRY CHECK (verifyCredential.ts — Step 4) ----
+
+expiresAt is stored in the signed bundle (off-chain commitment)
+  → tamper-proof: changing it would invalidate the ECDSA signature
+
+Check:
+  if (Math.floor(Date.now() / 1000) > bundle.expiresAt)
+    return { valid: false, reason: "Credential expired" }
+
+Note: expiry is enforced off-chain in the verification script.
+      An on-chain version could use block.timestamp inside verify()
+      for a fully trustless check — optional extension.
+
+
