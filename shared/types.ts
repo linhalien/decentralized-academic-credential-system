@@ -1,54 +1,50 @@
-/*
----- FILE: types.ts ----
-
-interface Course {
-  name  : string
-  grade : string        ← "A", "B+", "C", etc.
-  salt  : string        ← hex bytes32 (random, per course)
+export interface Course {
+  name: string;
+  grade: string;
+  salt: string;
 }
 
-interface CredentialBundle {
-  studentName   : string
-  studentId     : string
-  university    : string
-  graduationDate: string    ← ISO date string
-  expiresAt     : number    ← unix timestamp (graduation + 50 years)
-  courses       : Course[]
-  credentialHash: string    ← keccak256 of this bundle (without hash field)
+export interface CredentialBundle {
+  studentName: string;
+  studentId: string;
+  university: string;
+  graduationDate: string;
+  expiresAt: number;
+  courses: Course[];
+  credentialHash: string;
 }
 
-interface SignedCredential {
-  bundle       : CredentialBundle
-  signature    : string    ← ethers.js compact signature hex
-  signerAddress: string    ← university wallet address
-  merkleRoot   : string    ← bytes32 hex
+export interface SignedCredential {
+  bundle: CredentialBundle;
+  signature: string;
+  signerAddress: string;
+  merkleRoot: string;
 }
 
-interface ProofPackage {
-  credentialHash  : string
-  signerAddress   : string
-  signature       : string
-  expiresAt       : number
-  merkleRoot      : string
-  disclosedCourses: DisclosedCourse[]
+export interface DisclosedCourse {
+  name: string;
+  grade: string;
+  salt: string;
+  proof: string[];
 }
 
-interface DisclosedCourse {
-  name  : string
-  grade : string
-  salt  : string
-  proof : string[]    ← sibling hashes from root to leaf
+export interface ProofPackage {
+  credentialHash: string;
+  signerAddress: string;
+  signature: string;
+  expiresAt: number;
+  merkleRoot: string;
+  disclosedCourses: DisclosedCourse[];
 }
 
-interface VerificationResult {
-  valid           : boolean
-  signatureValid  : boolean
-  issuerAuthorized: boolean
-  notRevoked      : boolean
-  notExpired      : boolean
-  merkleProofsValid: boolean
-  reason          : string    ← human-readable failure reason if any
-  issuerAddress   : string
-  expiresAt       : number
+export interface VerificationResult {
+  valid: boolean;
+  signatureValid: boolean;
+  issuerAuthorized: boolean;
+  notRevoked: boolean;
+  notExpired: boolean;
+  merkleProofsValid: boolean;
+  reason: string;
+  issuerAddress: string;
+  expiresAt: number;
 }
-  */

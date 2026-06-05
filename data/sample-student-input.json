@@ -1,0 +1,11 @@
+{
+  "studentName": "Jane Doe",
+  "studentId": "STU001",
+  "university": "ITE University",
+  "graduationDate": "2025-06-01",
+  "courses": [
+    { "name": "Web Development", "grade": "A" },
+    { "name": "Blockchain", "grade": "B+" },
+    { "name": "Cryptography", "grade": "A-" }
+  ]
+}

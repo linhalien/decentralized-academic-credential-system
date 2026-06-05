@@ -13,8 +13,8 @@
   },
   "scripts": {
     "node": "cd contracts && npx hardhat node",
-    "deploy": "cd scripts && ts-node deploy/deploy.ts --network localhost",
-    "deploy:sepolia": "cd scripts && ts-node deploy/deploy.ts --network sepolia",
+    "deploy": "cd contracts && npx hardhat run ../scripts/deploy/deploy.ts --network localhost",
+    "deploy:sepolia": "cd contracts && npx hardhat run ../scripts/deploy/deploy.ts --network sepolia",
     "frontend": "cd frontend && vite",
     "test:contracts": "cd contracts && npx hardhat test",
     "test:e2e": "cd scripts && ts-node tests/integration/e2e.test.ts",

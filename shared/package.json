@@ -3,6 +3,11 @@
   "version": "1.0.0",
   "private": true,
   "main": "./types.ts",
+  "exports": {
+    ".": "./types.ts",
+    "./types": "./types.ts",
+    "./constants": "./constants.ts"
+  },
   "devDependencies": {
     "typescript": "^5.4.0"
   }
